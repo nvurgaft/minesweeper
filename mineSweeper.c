@@ -4,7 +4,7 @@
 *	- mineSweeper.c
 *
 *	original author: eli
-*	maintainer (aka intensive debugging efforts): nick	
+*	maintainer: nick	
 *
 */
 
