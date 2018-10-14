@@ -1,284 +1,270 @@
-/**
-*	
-*	Minesweeper for CLI-UNIX interfaces
-*	- mineSweeper.c
-*
-*	original author: eli
-*	maintainer: nick	
-*
-*/
-
-
-#include <stdio.h>
 #include <stdlib.h>
-#include <mineSweeper.h>
-#include <colorPrint.h>
 #include <time.h>
+#include <windows.h>
 
-int flags=0;
+//defining global STACK
+int stack[3];
+int top=-1;
+int score=0;                             //For Score Calculation
 
-bool initBoard(GameBoard *g, int rows, int cols, int level) {
-   	if (rows<4 || cols<4 || rows>MAX_BOARD_DIM || cols>MAX_BOARD_DIM) {
-   		printf("ERROR: invalid board size.\nSize should be at least 4 by 4 up to 20 by 20!\n");
-   		return 1;
-	}
+void welcome();
+void pop();
+void push();
+void pr_minesweeper();
+void gotoxy(int x,int y);
+void rand_mines(char msweep[12][12]);
+void delay();
+void printmatrix(char msweep[12][12],int r,char user_chart[12][12],int* ptr);
+int process(char msweep[12][12],int r,int c,char user_chart[12][12]);
 
-   	if (level<1 || level>3) {
-   		printf("ERROR: invalid level! should be a value between 1 to 3\n");
-   		return 1;
-   	}
-   	g->rows=rows;
-   	g->cols=cols;
-   
-   //dynamically allocate the board tiles
-   	g->board = (Tile **) malloc(rows*sizeof(Tile *));
-   	int i, j;
-   	for (i=0; i<rows; i++)
-   	{
-    	g->board[i] = (Tile *) malloc(cols*sizeof(Tile));
-   	}
-   	
-   	//zero the values
-	for (i=0; i<rows; i++) {
-   		for (j=0; j<cols; j++) {
-   			g->board[i][j].numOfMines = 0;
-   			g->board[i][j].isMine = 0;
-   			g->board[i][j].isVisible = 0;
-   		}
-   	}
-   	g->totalMines=0;
-   	g->isMineClicked=0;
-   	g->hiddenTiles = rows*cols; // if hidden tiles == #mines then victory condition
-
-   	if (level==1) populateMines(g, EASY_LEVEL_PERCENT);
-   	if (level==2) populateMines(g, MEDIUM_LEVEL_PERCENT);
-   	if (level==3) populateMines(g, HARD_LEVEL_PERCENT);
-
-   	markNumbers (g);
-   	
-   	return 0;
-}
-
-void populateMines(GameBoard *g , int percent) {
-    int mine_count = (((g->rows*g->cols)*percent)/100); //defines the amount of mines
-    
-    srand(time(NULL));
-    int mc; // mine count
-    for (mc=0; mc<mine_count; mc++) //generating random indexes ij
+int main()
+{
+    system("COLOR 47");
+    int q;
+    int* ptr=NULL;
+    q=45;
+    ptr=&q;
+                                                                           //size of array is 10,array starts from 1 to 11
+    char msweep[12][12] = {{'0'}};
+    int i,r,c;
+    char user_chart[12][12] = {{'0'}};
+    pr_minesweeper();
+    welcome();
+    for(i=0;i<3;i++)
     {
-		int i = rand() % g->rows;
-		int j = rand() % g->cols;
-		
-		if (g->board[i][j].isMine==1) //evoiding alrady populated fields
-		    mc--;
-		else {
-			g->board[i][j].isMine = 1;
-			g->board[i][j].numOfMines = -1;
-			g->totalMines++;
-		}
-    }
-}
-
-void markNumbers(GameBoard *g) {
-    int i , j ;
-    
-    for (j=0; j < g->cols; j++) 
-    {
-		for(i=0; i < g->rows; i++)
-		{    
-		    if (g->board[i][j].isMine==1)  //if the title hides a mine
-		    {
-				if(i < g->cols-1) // go right
-					g->board[i+1][j].numOfMines++;
-
-				if(i > 0) //go left
-					g->board[i-1][j].numOfMines++;
-
-				if(j < g->rows-1) //go down
-					g->board[i][j+1].numOfMines++;
-
-				if(j > 0) //go up
-					g->board[i][j-1].numOfMines++;
-
-				if(i < g->cols-1 && j<g->rows-1)// go right down
-					g->board[i+1][j+1].numOfMines++;
-
-				if(i < g->cols-1 && j>0 ) //go rigt and up
-					g->board[i+1][j-1].numOfMines++;
-
-				if(i > 0 && j>0 ) // go left and up
-					g->board[i-1][j-1].numOfMines++;
-
-				if(i > 0 && j<g->rows-1 ) //go left and down 
-					g->board[i-1][j+1].numOfMines++;				
-		    }
-		}
-	}
-}
-
-void clickTile(GameBoard *g, int row, int col) {
-    
-	// if the tile has no neighbouring mines AND is covered (0 value)..
-    if ( g->board[row][col].numOfMines==0 && g->board[row][col].isVisible==FALSE)
-    {
-		if (row < g->rows-1 && g->board[row][col].numOfMines==0 && g->board[row+1][col].numOfMines>=0 && g->board[row+1][col].isVisible<=0) { //can go right
-			g->board[row][col].isVisible=1;
-			clickTile(g, row+1, col);
-		}
-		if (col < g->cols-1 && g->board[row][col].numOfMines==0 && g->board[row][col+1].numOfMines>=0 && g->board[row][col+1].isVisible==0) { //can go down
-			g->board[row][col].isVisible=1;
-			clickTile(g, row, col+1);
-		}
-		if (row > 0 && g->board[row][col].numOfMines==0 && g->board[row-1][col].numOfMines>=0 && g->board[row-1][col].isVisible<=0) { //can go left
-			g->board[row][col].isVisible=1;
-			clickTile(g, row-1, col);
-		}
-		if (col > 0 && g->board[row][col].numOfMines==0 && g->board[row][col-1].numOfMines>=0 && g->board[row][col-1].isVisible<=0) { //can go up
-			g->board[row][col].isVisible=1;
-			clickTile(g, row, col-1);
-		}
-
-		g->board[row][col].isVisible=TRUE;
+        push(0);
     }
 
-    // if the tile neighbours a mine and is covered (0 < value)..
-	if ( g->board[row][col].numOfMines>0 && g->board[row][col].isVisible==FALSE)
-	{
-		g->board[row][col].isVisible=TRUE;
-	}
+    rand_mines(msweep);
+    *ptr=45;
+    printmatrix(msweep,12,user_chart,ptr);                                 // note grid from 1 to 11
 
-	// if the tile is uncovered then don't do anything
-    if (g->board[row][col].isVisible==TRUE) return;
-    // if the tile is flagged then it shouldn't be uncovered
-    else if (g->board[row][col].isFlagged==TRUE) return;
-    // if the tile is a mine, set the losing condition
-    else if (g->board[row][col].isMine==TRUE) {
-    	g->board[row][col].isVisible = 1;
-    	g->isMineClicked = 1;
+    printf("\nEnter your location(ONLY 1 - 11) on the minefield x,y\n");
+    *ptr=*ptr+2;
+    scanf("%d %d",&r,&c);
+
+    printmatrix(msweep,12,user_chart,ptr);
+
+    i = process(msweep,r,c,user_chart); //returns 1 or 0,1 is notmine 0 = mine
+
+    int count=0;
+    U:
+    while(i == 1)
+    {
+        printf("\nLucky BRAT, live on for another step\n");
+        printf(" %c Surrounding MINEs\n\n",msweep[r][c]);
+        *ptr=*ptr+4;
+
+        printmatrix(msweep,12,user_chart,ptr);
+        printf("\nEnter next move...(ONLY 1 - 11) ");
+        scanf("%d%d",&r,&c);
+        i=0;
+        gotoxy(50,*ptr);
+        i = process(msweep,r,c,user_chart);
     }
-    // uncover the tile
-    else {
-    	g->board[row][col].isVisible=1;
-    	g->board[row][col].isFlagged=0;
-    } 
+
+    if(i==0)
+    {
+        printf("\nGame OVER, ta ta. you stepped on a MINE !!\n");
+        if(top!=-1)
+        {
+            printf("Wanna Undo one step!!!!!! press 'u' for undo.....!!!!\n");
+            //Detect Click And Goto statement;
+            if(getch()=='u')
+            {
+                pop();
+                printf("Undo Remaining=%d\n",top+1);
+                i=1;
+                goto U;
+            }
+            else
+            {
+                goto End;
+            }
+        }
+        else
+        {
+            End:
+            printf("No More Undos remaining......!!!!! Game Over..!!!!");
+            printf("\n\n\n\n                                                                 Total SCORE=%d\n\n",score);
+        }
+    }
+    return 0;
+
 }
 
-void flagTile(GameBoard *g, int row, int col) {
-   
-   // if the tile is covered
-   if(g->board[row][col].isVisible==FALSE)
-   {
-   		// if the tile is flagged
-		if(g->board[row][col].isFlagged==FALSE) {
-	    	g->board[row][col].isFlagged=TRUE;
-	    	flags++;
-	    }
-		else {
-	    	g->board[row][col].isFlagged=FALSE;
-	    	flags--;
-	    }
-   }
+void welcome(int* ptr)
+{
+    int i;
+    char op; // opereation
+
+    printf("Welcome to MINESWEEPER in C >>........\n\n");
+    printf("Enter <<\n");
+    printf("         i for instructions\n");
+    printf("         any other key to enter game\n");
+    scanf("%c",&op);
+
+    if(op == 'i')
+    {
+        printf("OH DEAR, what a shock you are unfortunatly in the midst of a "); printf("mine field.\n");;
+        printf("Enter the coordinates of the x and y plane between 1 to 11\n");
+        printf("Are you destined to DIE or live ?\n");
+        printf("HA ha ha hah, GOOD LUCK\n\n");
+
+    }
+    else
+        return;
 }
 
-void printBoard(GameBoard *g, int cursorCoords[2]) {
-    int i , j ;
-    char format[3];
-    format[0]=' ';
-    format[1]=' ';
-    format[2]='\0';
-    
-    for (i=0; i<g->cols; i++) {
-		for(j=0; j<g->rows; j++) {
-		   	if (i==cursorCoords[0] && j==cursorCoords[1] && g->isMineClicked==FALSE) // if user and a mine isn't clicked
-		    {
-				format[0]=' ';
-				format[1]='*';
-				format[2]='\0';
-		    
-				colorPrint(FG_Black, BG_Yellow, ATT_Def, (char*) &format);
-		    }
+void rand_mines(char msweep[12][12])
+{
+    int r,c,m;
 
-		    else if (g->board[i][j].isFlagged==TRUE) // flag
-		    {
-				format[0]=' ';
-				format[1]='F';
-				format[2]='\0';
-		    
-				colorPrint(FG_Black, BG_Green, ATT_Def, (char*) &format);
-		    } 
-		    else if (g->board[i][j].isMine==1 && g->board[i][j].isVisible==1) // mine hit
-		    {
-				format[0]=' ';
-				format[1]='M';
-				format[2]='\0';
-				g->isMineClicked=1;
-		    
-				colorPrint(FG_Black, BG_Red, ATT_Def, (char*) &format);
-		    } 
-		    else if (g->board[i][j].isVisible==0) // covered tile
-		    {
-				format[0]=' ';
-				format[1]=' ';
-				format[2]='\0';
-		    
-				colorPrint(FG_White, BG_White, ATT_Def, (char*) &format);
-		    }
-		    else if (g->board[i][j].isMine==0 && g->board[i][j].isVisible==1) // uncovered numbered tile
-		    {
-				format[0]=' ';
-				format[1]= (char)(((int)'0')+g->board[i][j].numOfMines); //(a safer) int to char casting
-				format[2]='\0';
-		    
-				colorPrint(FG_Black, BG_White, ATT_Def, (char*) &format);
-		    }
-		}
-		printf("\n");
-	}  
+    srand(time(0));
+
+    for(m=0;m<20;m++) // plant 20 rand mines(m
+
+    {
+        r = rand() % 13; // this is mine planting
+                    // so can be at the edges aswell
+        c = rand() % 13; // so 0 to 13 is APPROPRIATE.
+        msweep[r][c] = '9';
+        printf("%d %d \n",r,c);
+
+    }
+
+    return;
+
 }
 
-void printInfo(GameBoard *g) {
-	g->hiddenTiles = 0;
-	int i,j;
+void printmatrix(char msweep[][12],int r,char user_chart[12][12],int* ptr)
+{
+    int i,j,t,k,p;
+    gotoxy(65,*ptr);
+    for(t=0;t<12;t++)
+    {
+        delay();
+        printf("%c%c",178,177);
+    }
 
-	for (i = 0; i < g->rows; i++) {
-		for (j = 0; j < g->cols; j++) {
-			if (g->board[i][j].isVisible==0) g->hiddenTiles++;
-		}
-	}
+    *ptr=(*ptr+1);                                        //For Center Printing
 
-	printf("\n# mines %d, # flags %d, # hidden tiles %d\n", g->totalMines, flags, g->hiddenTiles);
+    for(i=1;i<r;i++)
+    {
+        gotoxy(65,*ptr);
+        printf("%c",178);
+
+        for(j=1;j<12;j++)                                 //printing 1 to 11
+        {
+            printf("%c ",user_chart[i][j]);//to refer to mines use msweep[i][j]
+        }
+        delay();
+        printf("%c",178);
+        *ptr=*ptr+1;
+    }
+    gotoxy(65,*ptr);
+    for(t=0;t<12;t++)
+    {
+        delay();
+        printf("%c%c",178,177);
+    }
+
+    *ptr=*ptr+1;
+
+    return;
 }
 
-void printUncoveredBoard(GameBoard *g) {
-    int i , j ;
+int process(char msweep[12][12],int r,int c,char user_chart[12][12])
+{
+    int i=r,j=c,b=0,k;
+    char C;
 
-    printf("\nThis is the board when fully uncovered\nUse for debugging purposes only\n");
-    printf("\n\tM - mine\n\t# - the amount of mines surrounding the tile\n\n");
-    
-    for (i=0; i<g->cols; i++) {
-		for(j=0; j<g->rows; j++) { //left table
-		   	
-		   	if (g->board[i][j].isMine==0) printf("_ ");
-		   	else printf("M ");
-		}
-		printf("\t");
+    if(msweep[r][c] == '9')
+    {
+        k=0;
+        return k;
+    }
+    else
+    {
+        if(msweep[i-1][j-1] == '9')
+        b++;
+        if(msweep[i-1][j] == '9')
+        b++;
+        if(msweep[i-1][j+1] == '9')
+        b++;
+        if(msweep[i][j-1] == '9')
+        b++;
+        if(msweep[i][j+1] == '9')
+        b++;
+        if(msweep[i+1][j-1] == '9')
+        b++;
+        if(msweep[i+1][j] == '9')
+        b++;
+        if(msweep[i+1][j+1] == '9')
+        b++;
 
-		for(j=0; j<g->rows; j++) {	//right table
-		   	
-		   	if (g->board[i][j].isMine==0) printf("%d ", g->board[i][j].numOfMines);
-		   	else printf("- ");
-		}
+        C = (char)(((int)'0')+b); // to covert int to char;
+        score=score+b;
+        msweep[r][c] = C;
+        user_chart[r][c] = C;
+  }
 
-		printf("\n");
-	} 
+    return 1;
 
-	printf("Total mines: %d\n",g->totalMines);
 }
+void delay()
+{
+    int i,j;
+    for(i=0;i<1000;i++)
+    {
+        for(j=0;j<10000;j++)
+        {
 
-void destroyBoard(GameBoard *g) {
-	int ii;
-	for (ii=0; ii < g->rows; ii++) {
-		free(g->board[ii]);
-	}
-	free(g->board);
+        }
+    }
+    return;
+}
+void pr_minesweeper()
+{
+        gotoxy(50,10);
+
+        //first line
+
+        printf("| \\  / |  ");delay();printf("|_  _|  ");delay();printf("| \\| |  ");delay();printf("|==  ");delay();
+        printf("/ /  ");delay();printf("\\ \\    / /  ");delay();printf("|==  ");delay();printf("|==  ");delay();
+        printf("| |_)  ");delay();printf("|==  ");delay();printf("| | )  \n");delay();
+        gotoxy(50,11);
+
+        //second line
+
+        printf("| |\\/| |  ");delay();printf("  | |   ");delay();printf("| |\\ |  ");delay();printf("|=   ");delay();
+        printf("\\ \\  ");delay();printf(" \\ \\/\\/ /   ");delay();printf("|=   ");delay();
+        printf("|=   ");delay();printf("| |    ");delay();printf("|=   ");delay();printf("| |\\   \n");delay();
+        gotoxy(50,12);
+
+        //third line
+
+        printf("|_|  |_|  ");delay();printf("|____|  ");delay();printf("|_| \\_| ");delay();printf("|==  ");delay();
+        printf("/_/  ");delay();printf("  \\_/\\_/    ");delay();printf("|==  ");delay();printf("|==  ");delay();
+        printf("|_|    ");delay();printf("|==  ");delay();printf("|_| \\   \n");delay();
+
+        return;
+}
+void gotoxy(int x,int y)
+{
+    COORD c;
+    c.X=x;
+    c.Y=y;
+    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE),c);
+}
+void pop()
+{
+    top--;
+    return;
+}
+void push(int x)
+{
+    top++;
+    stack[top]=x;
+    return;
 }
